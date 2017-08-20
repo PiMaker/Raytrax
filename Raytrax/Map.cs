@@ -84,6 +84,9 @@ namespace Raytrax
 
         private float? rayCast(Vector2 aabbPos, Vector2 pos, Vector2 delta, out float texCoord)
         {
+            // Partially taken from https://noonat.github.io/intersect/#aabb-vs-segment
+            // Modified to include (only) the things I needed here
+
             texCoord = -1;
 
             var scaleX = 1.0f / delta.X;
