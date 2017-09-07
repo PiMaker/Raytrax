@@ -26,12 +26,12 @@ namespace Raytrax
 
         protected override void Initialize()
         {
-            BaseGame.ScreenWidth = 1920;
-            BaseGame.ScreenHeight = 1080;
+            BaseGame.ScreenWidth = 1280;
+            BaseGame.ScreenHeight = 720;
 
             this.graphics.PreferredBackBufferWidth = BaseGame.ScreenWidth;
             this.graphics.PreferredBackBufferHeight = BaseGame.ScreenHeight;
-            this.graphics.IsFullScreen = true;
+            this.graphics.IsFullScreen = false;
             this.graphics.ApplyChanges();
 
             InputManager.Init();

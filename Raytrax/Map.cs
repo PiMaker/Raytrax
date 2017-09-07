@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
@@ -19,7 +20,7 @@ namespace Raytrax
         public int DimensionX => this.map.GetLength(0);
         public int DimensionY => this.map.GetLength(1);
 
-        public RayTraceResult CastRay(Ray2D ray)
+        public RayTraceResult CastRay(Ray2D ray, IEnumerable<Point> ignored = null)
         {
             Vector2 rayDelta;
             float lengthMod;
@@ -50,10 +51,10 @@ namespace Raytrax
                 rayDelta = lengthMod * ray.Direction;
             }
 
-            return this.castDeltaRay(ray.Position, rayDelta, 1f / lengthMod);
+            return this.CastDeltaRay(ray.Position, rayDelta, 1f / lengthMod, ignored);
         }
 
-        private RayTraceResult castDeltaRay(Vector2 position, Vector2 rayDelta, float rayLengthMod)
+        private RayTraceResult CastDeltaRay(Vector2 position, Vector2 rayDelta, float rayLengthMod, IEnumerable<Point> ignored = null)
         {
             var dirX = rayDelta.X < 0 ? -1 : 1;
             var dirY = rayDelta.Y < 0 ? -1 : 1;
@@ -61,14 +62,22 @@ namespace Raytrax
             var posX = (int) position.X;
             var posY = (int) position.Y;
 
+            // Not really elegant, especially performance wise (this IS a hot path)... But hey, it works
+            var ignoredArray = ignored as Point[] ?? (ignored ?? new Point[0]).ToArray();
+
             for (var x = posX; x < this.map.GetLength(0) && x >= 0; x += dirX)
             {
                 for (var y = posY; y < this.map.GetLength(1) && y >= 0; y += dirY)
                 {
                     if (this.map[x, y] != null)
                     {
-                        var hit = this.rayCast(this.map[x, y].Rectangle.Position + new Vector2(0.5f, 0.5f), position,
-                            rayDelta, out float texCoord);
+                        if (ignoredArray.Any(i => i.X == x && i.Y == y))
+                        {
+                            continue;
+                        }
+
+                        var hit = this.RayCast(this.map[x, y].Rectangle.Position + new Vector2(0.5f, 0.5f), position,
+                            rayDelta, out var texCoord);
 
                         if (hit.HasValue)
                         {
@@ -82,7 +91,7 @@ namespace Raytrax
             return new RayTraceResult(false, -1, null, new Ray2D(), -1);
         }
 
-        private float? rayCast(Vector2 aabbPos, Vector2 pos, Vector2 delta, out float texCoord)
+        private float? RayCast(Vector2 aabbPos, Vector2 pos, Vector2 delta, out float texCoord)
         {
             // Partially taken from https://noonat.github.io/intersect/#aabb-vs-segment
             // Modified to include (only) the things I needed here
@@ -208,10 +217,10 @@ namespace Raytrax
                 {
                     if (this.map[x, y] != null)
                     {
-                        if (this.map[x, y].Mode == Block.DrawMode.Color)
+                        if (this.map[x, y].Mode == Block.DrawMode.Color || this.map[x, y].Mode == Block.DrawMode.ColorAlpha)
                         {
                             spriteBatch.FillRectangle(offset + new Vector2(x * blockWidth, y * blockHeight), blockSize,
-                                this.map[x, y].Color * 0.5f);
+                                new Color(this.map[x, y].Color.ToVector3()) * 0.5f);
                         }
                         else if (this.map[x, y].Mode == Block.DrawMode.Texture)
                         {
@@ -262,6 +271,7 @@ namespace Raytrax
                     map = new Block[dimX, dimY];
 
                     var rgbLookup = new Dictionary<char, Color>();
+                    var rgbaLookup = new Dictionary<char, Color>();
                     var texLookup = new Dictionary<char, Texture2D>();
 
                     while (true)
@@ -277,6 +287,13 @@ namespace Raytrax
                                 var color = new Color(int.Parse(colorSplit[0]), int.Parse(colorSplit[1]),
                                     int.Parse(colorSplit[2]));
                                 rgbLookup.Add(split[0][0], color);
+                            }
+                            else if (split[1] == "rgba")
+                            {
+                                var colorSplit = split[2].Split(',');
+                                var color = new Color(int.Parse(colorSplit[0]), int.Parse(colorSplit[1]),
+                                    int.Parse(colorSplit[2]), int.Parse(colorSplit[3]));
+                                rgbaLookup.Add(split[0][0], color);
                             }
                             else if (split[1] == "tex")
                             {
@@ -300,7 +317,12 @@ namespace Raytrax
                                 if (rgbLookup.ContainsKey(line[j]))
                                 {
                                     map[j, i] = new Block(new RectangleF(new Point2(j, i), new Size2(1, 1)),
-                                        rgbLookup[line[j]]);
+                                        rgbLookup[line[j]], Block.DrawMode.Color);
+                                }
+                                else if (rgbaLookup.ContainsKey(line[j]))
+                                {
+                                    map[j, i] = new Block(new RectangleF(new Point2(j, i), new Size2(1, 1)),
+                                        rgbaLookup[line[j]], Block.DrawMode.ColorAlpha);
                                 }
                                 else if (texLookup.ContainsKey(line[j]))
                                 {

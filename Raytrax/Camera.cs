@@ -1,4 +1,9 @@
-﻿using System;
+﻿// File: Camera.cs
+// Created: 07.09.2017
+// 
+// See <summary> tags for more information.
+
+using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -68,28 +73,7 @@ namespace Raytrax
 
             for (var i = 0; i < BaseGame.ScreenWidth; i++)
             {
-                var ray = new Ray2D(this.position, forward);
-                var result = this.map.CastRay(ray);
-                traceResults.Add(result);
-
-                if (result.Hit && result.Distance > 0)
-                {
-                    var dist = Camera.antiFisheye(result.Distance, angle);
-                    var height = halfScreenHeight / (dist / fullHeightDist);
-
-                    if (result.Block.Mode == Block.DrawMode.Color)
-                    {
-                        spriteBatch.DrawLine(i, halfScreenHeight - height, i, halfScreenHeight + height,
-                            result.Block.Color);
-                    }
-                    else if (result.Block.Mode == Block.DrawMode.Texture)
-                    {
-                        spriteBatch.Draw(result.Block.Texture,
-                            new Rectangle(i, (int) (halfScreenHeight - height), 1, (int) (height * 2)),
-                            new Rectangle((int) (result.Block.Texture.Width * result.TexCoord), 0, 1,
-                                result.Block.Texture.Height), Color.White);
-                    }
-                }
+                this.DrawTrace(spriteBatch, i, angle, forward, halfScreenHeight, fullHeightDist, traceResults);
 
                 forward = forward.Rotate(angleMod);
                 angle += angleMod;
@@ -102,7 +86,60 @@ namespace Raytrax
                 traceResults);
         }
 
-        private static float antiFisheye(float dist, float angle)
+        private void DrawTrace(SpriteBatch spriteBatch, int xpos, float angle, Vector2 forward, float halfScreenHeight,
+            float fullHeightDist, List<RayTraceResult> traceResults, List<Point> ignored = null)
+        {
+            var ray = new Ray2D(this.position, forward);
+            var result = this.map.CastRay(ray, ignored);
+            traceResults.Add(result);
+
+            if (result.Hit && result.Distance > 0)
+            {
+                var dist = Camera.AntiFisheye(result.Distance, angle);
+                var height = halfScreenHeight / (dist / fullHeightDist);
+
+                if (result.Block.Mode == Block.DrawMode.Color)
+                {
+                    Camera.DrawColorLine(spriteBatch, xpos, halfScreenHeight, height, result.Block.Color);
+                }
+                else if (result.Block.Mode == Block.DrawMode.Texture)
+                {
+                    Camera.DrawTextureLine(spriteBatch, result.Block.Texture, result.TexCoord, xpos, halfScreenHeight,
+                        height);
+                }
+                else if (result.Block.Mode == Block.DrawMode.ColorAlpha)
+                {
+                    var ig = ignored ?? new List<Point>();
+                    ig.Add(result.Block.Rectangle.Position.ToPoint());
+                    this.DrawTrace(spriteBatch, xpos, angle, forward, halfScreenHeight, fullHeightDist, traceResults,
+                        ig);
+
+                    if (ignored == null)
+                    {
+                        Camera.DrawColorLine(spriteBatch, xpos, halfScreenHeight, height, result.Block.Color);
+                    }
+                }
+            }
+        }
+
+        private static void DrawTextureLine(SpriteBatch spriteBatch, Texture2D texture, float texCoord, int xpos,
+            float halfScreenHeight,
+            float height)
+        {
+            spriteBatch.Draw(texture,
+                new Rectangle(xpos, (int) (halfScreenHeight - height), 1, (int) (height * 2)),
+                new Rectangle((int) (texture.Width * texCoord), 0, 1,
+                    texture.Height), Color.White);
+        }
+
+        private static void DrawColorLine(SpriteBatch spriteBatch, int xpos, float halfScreenHeight, float height,
+            Color color)
+        {
+            spriteBatch.DrawLine(xpos, halfScreenHeight - height, xpos, halfScreenHeight + height,
+                color);
+        }
+
+        private static float AntiFisheye(float dist, float angle)
         {
             angle = Math.Abs(angle);
             if (angle > MathHelper.PiOver4)

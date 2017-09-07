@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using MonoGame.Extended;
 
@@ -9,14 +10,20 @@ namespace Raytrax
         public enum DrawMode
         {
             Color,
-            Texture
+            Texture,
+            ColorAlpha
         }
 
-        public Block(RectangleF rectangle, Color color)
+        public Block(RectangleF rectangle, Color color, DrawMode mode)
         {
+            if (mode != DrawMode.Color && mode != DrawMode.ColorAlpha)
+            {
+                throw new ArgumentException("Mode has to be Color or ColorAlpha for this constructor.", nameof(mode));
+            }
+
             this.Rectangle = rectangle;
             this.Color = color;
-            this.Mode = DrawMode.Color;
+            this.Mode = mode;
         }
 
         public Block(RectangleF rectangle, Texture2D texture)
